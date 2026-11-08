@@ -1,0 +1,81 @@
+{% extends "base.html" %}
+{% import "_macros.html" as m %}
+{% block titulo %}Historial{% endblock %}
+{% block contenido %}
+{% macro enlace_orden(clave, texto) -%}
+  {%- set args = dict(request.args) -%}
+  {%- set nueva_dir = 'desc' if (form.orden == clave and form.dir == 'asc') else 'asc' -%}
+  {%- set _ = args.update({'orden': clave, 'dir': nueva_dir, 'pagina': 1}) -%}
+  <a href="{{ url_for('datos.index', **args) }}">{{ texto }}{% if form.orden == clave %} <i class="bi bi-caret-{{ 'up' if form.dir == 'asc' else 'down' }}-fill"></i>{% endif %}</a>
+{%- endmacro %}
+{% macro enlace_pagina(n) -%}
+  {%- set args = dict(request.args) -%}{%- set _ = args.update({'pagina': n}) -%}{{ url_for('datos.index', **args) }}
+{%- endmacro %}
+{{ m.encabezado(2, "Historial de monitoreo", "Hoja «Historial» del Excel con paginación del lado del servidor: solo se envían al navegador las filas de la página actual.") }}
+{{ m.aviso_sintetico() }}
+
+<div class="d-flex flex-wrap gap-2 mb-3">
+  <a class="btn btn-naranja" href="{{ url_for('datos.descargar') }}"><i class="bi bi-download"></i> Descargar Excel original</a>
+  <button class="btn btn-outline-primary" type="button" data-bs-toggle="collapse" data-bs-target="#diccionario"><i class="bi bi-book"></i> Diccionario de datos</button>
+  <span class="ms-auto small text-muted align-self-center">{{ total_archivo }} registros en el archivo · {{ ausentes }} temperaturas ausentes</span>
+</div>
+
+<div class="collapse mb-3" id="diccionario"><div class="card card-body">
+  <div class="row">
+    <div class="col-lg-8"><table class="table table-sm"><thead><tr><th>Campo</th><th>Unidad / tipo</th><th>Descripción</th></tr></thead>
+      <tbody>{% for d in diccionario %}<tr><td><strong>{{ d.campo }}</strong></td><td>{{ d.unidad }}</td><td>{{ d.descripcion }}</td></tr>{% endfor %}</tbody></table></div>
+    <div class="col-lg-4"><table class="table table-sm"><thead><tr><th>Supuesto</th><th>Valor</th></tr></thead>
+      <tbody>{% for s in supuestos %}<tr><td>{{ s.supuesto }}</td><td>{{ s.valor }}</td></tr>{% endfor %}</tbody></table></div>
+  </div>
+</div></div>
+
+<form class="card card-body mb-3" method="get">
+  <div class="row g-2 align-items-end">
+    <div class="col-sm-6 col-md-2"><label class="form-label" for="desde">Desde</label><input class="form-control" type="date" id="desde" name="desde" value="{{ form.desde or '' }}"></div>
+    <div class="col-sm-6 col-md-2"><label class="form-label" for="hasta">Hasta</label><input class="form-control" type="date" id="hasta" name="hasta" value="{{ form.hasta or '' }}"></div>
+    <div class="col-sm-6 col-md-2"><label class="form-label" for="estado">Estado</label>
+      <select class="form-select" id="estado" name="estado"><option value="">Todos</option>
+        {% for e in estados %}<option value="{{ e }}" {{ 'selected' if form.estado == e }}>{{ e }}</option>{% endfor %}</select></div>
+    <div class="col-sm-6 col-md-3"><label class="form-label" for="q">Buscar (evento, ID o fecha «2026-08-04 01»)</label><input class="form-control" id="q" name="q" value="{{ form.q }}" maxlength="60"></div>
+    <div class="col-sm-6 col-md-1"><label class="form-label" for="por_pagina">Filas</label>
+      <select class="form-select" id="por_pagina" name="por_pagina">{% for n in (10, 25, 50, 100) %}<option {{ 'selected' if form.por_pagina == n }}>{{ n }}</option>{% endfor %}</select></div>
+    <input type="hidden" name="orden" value="{{ form.orden }}"><input type="hidden" name="dir" value="{{ form.dir }}">
+    <div class="col-sm-6 col-md-2 d-flex gap-2"><button class="btn btn-primary flex-fill"><i class="bi bi-search"></i> Buscar</button>
+      <button class="btn btn-outline-secondary" type="button" data-restablecer title="Restablecer"><i class="bi bi-x-lg"></i></button></div>
+  </div>
+</form>
+{{ m.errores_formulario(errores) }}
+
+<div class="card"><div class="card-body">
+  <div class="small text-muted mb-2">{{ datos.total }} registros coinciden · página {{ datos.pagina }} de {{ datos.paginas }}</div>
+  <div class="table-responsive"><table class="table table-sm table-hover align-middle">
+    <thead class="table-light"><tr>
+      <th>{{ enlace_orden('id', 'ID registro') }}</th><th>{{ enlace_orden('fecha', 'Fecha y hora') }}</th><th>Servidor</th>
+      <th>{{ enlace_orden('cpu', 'CPU (%)') }}</th><th>{{ enlace_orden('ram', 'RAM (%)') }}</th><th>{{ enlace_orden('potencia', 'Potencia (W)') }}</th>
+      <th>{{ enlace_orden('temp_entrada', 'Temp. entrada (°C)') }}</th><th>{{ enlace_orden('temp', 'Temp. servidor (°C)') }}</th>
+      <th>{{ enlace_orden('ventilador', 'Ventilador (RPM)') }}</th><th>{{ enlace_orden('estado', 'Estado') }}</th><th>{{ enlace_orden('evento', 'Evento') }}</th>
+    </tr></thead>
+    <tbody>
+    {% for l in datos.filas %}
+      <tr class="fila-{{ l.estado.split(' ')[0] }}">
+        <td><code class="mono">{{ l.id_registro }}</code></td><td>{{ l.fecha_hora.strftime('%Y-%m-%d %H:%M') }}</td><td>{{ l.servidor }}</td>
+        <td>{{ '%.2f'|format(l.cpu) }}</td><td>{{ '%.2f'|format(l.ram) }}</td><td>{{ '%.2f'|format(l.potencia) }}</td><td>{{ '%.2f'|format(l.temp_entrada) }}</td>
+        <td>{% if l.tiene_temperatura %}{{ '%.2f'|format(l.temp_servidor) }}{% else %}<span class="text-muted fst-italic">sin dato</span>{% endif %}</td>
+        <td>{{ l.ventilador }}</td><td><span class="estado estado-{{ l.estado.split(' ')[0] }}">{{ l.estado }}</span></td><td class="small">{{ l.evento }}</td>
+      </tr>
+    {% else %}
+      <tr><td colspan="11" class="text-center text-muted">No hay registros con esos filtros.</td></tr>
+    {% endfor %}
+    </tbody>
+  </table></div>
+  <nav><ul class="pagination pagination-sm flex-wrap mb-0">
+    <li class="page-item {{ 'disabled' if datos.pagina == 1 }}"><a class="page-link" href="{{ enlace_pagina(1) }}">«</a></li>
+    <li class="page-item {{ 'disabled' if datos.pagina == 1 }}"><a class="page-link" href="{{ enlace_pagina(datos.pagina - 1) }}">‹</a></li>
+    {% for n in range([1, datos.pagina - 3]|max, [datos.paginas, datos.pagina + 3]|min + 1) %}
+      <li class="page-item {{ 'active' if n == datos.pagina }}"><a class="page-link" href="{{ enlace_pagina(n) }}">{{ n }}</a></li>
+    {% endfor %}
+    <li class="page-item {{ 'disabled' if datos.pagina == datos.paginas }}"><a class="page-link" href="{{ enlace_pagina(datos.pagina + 1) }}">›</a></li>
+    <li class="page-item {{ 'disabled' if datos.pagina == datos.paginas }}"><a class="page-link" href="{{ enlace_pagina(datos.paginas) }}">»</a></li>
+  </ul></nav>
+</div></div>
+{% endblock %}

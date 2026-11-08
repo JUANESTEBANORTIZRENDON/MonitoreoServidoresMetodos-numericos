@@ -1,0 +1,64 @@
+{# Componentes del modo presentación: carrusel de diapositivas navegable. #}
+
+{% macro presentacion(id, tema, color='azul') %}
+<section class="presentacion presentacion-{{ color }} mb-4" id="{{ id }}" tabindex="-1">
+  <div class="presentacion-barra">
+    <span class="presentacion-etiqueta"><i class="bi bi-easel2"></i> Presentación</span>
+    <strong class="presentacion-tema">{{ tema }}</strong>
+    <span class="ms-auto presentacion-contador" data-contador>1 / 1</span>
+    <button type="button" class="btn btn-sm btn-light" data-pantalla-completa="#{{ id }}" title="Pantalla completa (F)">
+      <i class="bi bi-arrows-fullscreen"></i><span class="d-none d-md-inline"> Pantalla completa</span></button>
+  </div>
+  <div class="presentacion-progreso"><div class="presentacion-progreso-barra" data-progreso></div></div>
+  <div id="{{ id }}-carrusel" class="carousel slide" data-bs-ride="false" data-bs-interval="false"
+       data-bs-keyboard="false" data-bs-wrap="false" data-bs-touch="true">
+    <div class="carousel-inner">{{ caller() }}</div>
+  </div>
+  <div class="presentacion-pie">
+    <button class="btn btn-outline-light btn-sm" type="button" data-bs-target="#{{ id }}-carrusel" data-bs-slide="prev">
+      <i class="bi bi-chevron-left"></i> Anterior</button>
+    <div class="presentacion-puntos" data-puntos="#{{ id }}-carrusel"></div>
+    <button class="btn btn-naranja btn-sm" type="button" data-bs-target="#{{ id }}-carrusel" data-bs-slide="next">
+      Siguiente <i class="bi bi-chevron-right"></i></button>
+  </div>
+  <div class="presentacion-ayuda">Use ← → (o el control de diapositivas), deslice en pantallas táctiles o pulse F para pantalla completa.</div>
+</section>
+{% endmacro %}
+
+{% macro diapositiva(titulo, seccion='', activa=false) %}
+<div class="carousel-item {{ 'active' if activa }}">
+  <div class="diapositiva">
+    <div class="diapositiva-encabezado">
+      {% if seccion %}<span class="diapositiva-seccion">{{ seccion }}</span>{% endif %}
+      <h3>{{ titulo }}</h3>
+    </div>
+    <div class="diapositiva-cuerpo">{{ caller() }}</div>
+  </div>
+</div>
+{% endmacro %}
+
+{% macro portada(titulo, subtitulo, clave_expositor, expositor_defecto, datos) %}
+<div class="carousel-item active">
+  <div class="diapositiva diapositiva-portada">
+    <div class="portada-modulo">{{ datos.modulo }}</div>
+    <h2>{{ titulo }}</h2>
+    <p class="portada-subtitulo">{{ subtitulo }}</p>
+    <div class="portada-expositor"><i class="bi bi-person-badge"></i> Expositor:
+      <span contenteditable="true" spellcheck="false" data-guardar="{{ clave_expositor }}" title="Haga clic para escribir su nombre">{{ expositor_defecto }}</span></div>
+    <div class="portada-datos">
+      {% for etiqueta, valor in datos.cifras %}<div><span>{{ etiqueta }}</span><strong>{{ valor }}</strong></div>{% endfor %}
+    </div>
+    <div class="portada-pie">Monitor Numérico de Centro de Datos · servidor {{ datos.servidor }} · datos sintéticos de uso académico</div>
+  </div>
+</div>
+{% endmacro %}
+
+{% macro cifra(etiqueta, valor, unidad='', destacada=false) %}
+<div class="cifra {{ 'cifra-destacada' if destacada }}"><span class="cifra-etiqueta">{{ etiqueta }}</span>
+  <span class="cifra-valor">{{ valor }}<small> {{ unidad }}</small></span></div>
+{% endmacro %}
+
+{% macro separador_detalles(titulo='Detalles del cálculo paso a paso') %}
+<div class="separador-detalles"><span><i class="bi bi-journal-text"></i> {{ titulo }}</span>
+  <small>Referencia completa para responder preguntas: datos, sustituciones, tablas y gráficas.</small></div>
+{% endmacro %}

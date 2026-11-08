@@ -1,0 +1,64 @@
+{# Componentes reutilizables de las vistas #}
+
+{% macro encabezado(numero, titulo, subtitulo) %}
+<div class="encabezado-modulo">
+  <div class="text-uppercase small text-muted fw-semibold">Módulo {{ numero }}</div>
+  <h2>{{ titulo }}</h2>
+  <div class="text-muted">{{ subtitulo }}</div>
+</div>
+{% endmacro %}
+
+{% macro errores_formulario(errores) %}
+  {% for e in errores %}
+    <div class="alert alert-warning py-2 mb-2"><i class="bi bi-exclamation-triangle"></i> {{ e }}</div>
+  {% endfor %}
+{% endmacro %}
+
+{% macro bloque(tipo, titulo) %}
+<div class="bloque bloque-{{ tipo }}">
+  <div class="bloque-titulo">{{ titulo }}</div>
+  <div class="bloque-cuerpo">{{ caller() }}</div>
+</div>
+{% endmacro %}
+
+{% macro paso(numero, titulo) %}
+<div class="paso mb-3">
+  <h5><span class="paso-num">{{ numero }}</span>{{ titulo }}</h5>
+  {{ caller() }}
+</div>
+{% endmacro %}
+
+{% macro grafica(id, g, alto=360) %}
+{% if g %}
+<div class="grafica-contenedor" style="height: {{ alto }}px"><canvas id="{{ id }}" aria-label="{{ g.titulo }}" role="img"></canvas></div>
+<script type="application/json" data-grafica-para="{{ id }}">{{ g|tojson }}</script>
+{% endif %}
+{% endmacro %}
+
+{# columnas: lista de (clave, encabezado[, 'txt'|'bool'|'int']) ; clave admite 'ks.k1' #}
+{% macro tabla(filas, columnas, resaltar_ultima=false) %}
+<div class="tabla-iter">
+  <table class="table table-sm table-striped table-hover align-middle">
+    <thead><tr>{% for c in columnas %}<th>{{ c[1] }}</th>{% endfor %}</tr></thead>
+    <tbody>
+    {% for fila in filas %}
+      <tr class="{{ 'fila-convergencia' if resaltar_ultima and loop.last }}">
+      {% for c in columnas %}
+        {% set partes = c[0].split('.') %}
+        {% if partes|length == 2 %}{% set v = (fila[partes[0]] or {}).get(partes[1]) %}{% else %}{% set v = fila.get(c[0]) %}{% endif %}
+        {% set tipo = c[2] if c|length > 2 else 'num' %}
+        <td>{% if tipo == 'txt' %}{{ v if v is not none else '—' }}{% elif tipo == 'int' %}{{ v if v is not none else '—' }}{% elif tipo == 'bool' %}{{ 'Sí' if v else 'No' }}{% else %}{{ v|f5 }}{% endif %}</td>
+      {% endfor %}
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endmacro %}
+
+
+
+{% macro aviso_sintetico() %}
+<div class="aviso-sintetico mb-3"><i class="bi bi-info-circle-fill"></i> <strong>Datos sintéticos para uso académico.</strong> No corresponden a un centro de datos real. Fuente: <code>data/Historial_Monitoreo_Servidor_3_Meses.xlsx</code>.</div>
+{% endmacro %}
+

@@ -1,0 +1,252 @@
+{% extends "base.html" %}
+{% import "_macros.html" as m %}
+{% import "_presentacion.html" as p with context %}
+{% block titulo %}Ecuaciones diferenciales{% endblock %}
+{% block contenido %}
+{{ m.encabezado(4, "Ecuaciones diferenciales ordinarias: modelo térmico", "Euler, Heun, Ralston y Runge-Kutta 4 con potencia y temperatura de entrada tomadas del Excel.") }}
+
+<form class="card card-body mb-3" method="get"><div class="row g-2 align-items-end">
+  <div class="col-6 col-md-2"><label class="form-label" for="fecha">Fecha inicial (00:00)</label><input class="form-control" type="date" id="fecha" name="fecha" value="{{ form.fecha }}" min="{{ rango[0] }}" max="{{ rango[1] }}"></div>
+  <div class="col-6 col-md-1"><label class="form-label" for="horas">Duración (h)</label><input class="form-control" type="number" min="1" max="168" id="horas" name="horas" value="{{ form.horas }}"></div>
+  <div class="col-6 col-md-2"><label class="form-label" for="alfa">α (°C/(h·W))</label><input class="form-control" type="number" step="any" id="alfa" name="alfa" value="{{ form.alfa }}"></div>
+  <div class="col-6 col-md-1"><label class="form-label" for="beta">β (h⁻¹)</label><input class="form-control" type="number" step="any" id="beta" name="beta" value="{{ form.beta }}"></div>
+  <div class="col-6 col-md-2"><label class="form-label" for="P_idle">P<sub>idle</sub> (W)</label><input class="form-control" type="number" step="any" id="P_idle" name="P_idle" value="{{ form.P_idle }}"></div>
+  <div class="col-6 col-md-1"><label class="form-label" for="h">Paso h (h)</label><input class="form-control" type="number" step="any" min="0.05" id="h" name="h" value="{{ form.h }}"></div>
+  <div class="col-md-3 d-flex gap-2"><button class="btn btn-primary flex-fill">Simular</button><button type="button" class="btn btn-outline-secondary" data-restablecer>Por defecto</button></div>
+</div></form>
+{{ m.errores_formulario(errores) }}
+
+{% if resultados %}
+{% set rk4 = resultados[3] %}
+{% set c4 = comparacion[3] %}
+
+{# ============================ PRESENTACIÓN ============================ #}
+{% set info = {
+  'Euler': {'orden': 1, 'idea': 'Avanza con la pendiente del inicio del intervalo, como si la temperatura cambiara en línea recta durante toda la hora.',
+            'formula': 'T_{i+1} = T_i + h\\,k_1, \\qquad k_1 = f(t_i, T_i)',
+            'ventaja': 'Una sola evaluación de f por paso: el más simple y rápido.', 'limitacion': 'Orden 1: acumula el mayor error con h = 1 h.'},
+  'Heun (Euler mejorado)': {'orden': 2, 'idea': 'Predice con Euler, evalúa la pendiente al final de la hora y promedia ambas pendientes (predictor–corrector).',
+            'formula': 'k_2 = f(t_i + h,\\ T_i + h k_1), \\qquad T_{i+1} = T_i + \\tfrac{h}{2}(k_1 + k_2)',
+            'ventaja': 'Orden 2 con solo 2 evaluaciones.', 'limitacion': 'Necesita la entrada P(t) al final del paso.'},
+  'Ralston (2.º orden)': {'orden': 2, 'idea': 'Evalúa la segunda pendiente a 3/4 del paso y la pondera 2:1; minimiza el error de truncamiento entre los métodos de 2 etapas.',
+            'formula': 'k_2 = f(t_i + \\tfrac{3}{4}h,\\ T_i + \\tfrac{3}{4}h k_1), \\qquad T_{i+1} = T_i + \\tfrac{h}{3}(k_1 + 2k_2)',
+            'ventaja': 'Orden 2 con constante de error mínima.', 'limitacion': 'Evalúa en t + 3h/4: requiere interpolar las entradas.'},
+  'Runge-Kutta 4': {'orden': 4, 'idea': 'Combina cuatro pendientes: al inicio, dos en el punto medio y al final, con pesos 1-2-2-1.',
+            'formula': 'T_{i+1} = T_i + \\tfrac{h}{6}(k_1 + 2k_2 + 2k_3 + k_4)',
+            'ventaja': 'Orden 4: muy preciso con pasos grandes.', 'limitacion': '4 evaluaciones por paso; sigue siendo una aproximación, no la solución exacta.'}
+} %}
+{% call p.presentacion('pres-edo', 'Ecuaciones diferenciales · gemelo digital térmico del servidor', 'verde') %}
+
+  {{ p.portada('Ecuaciones diferenciales ordinarias', 'Simulación de la temperatura del servidor hora a hora con Euler, Heun, Ralston y Runge-Kutta 4, usando la potencia y el aire de entrada del Excel.',
+       'edo', 'Expositor 2',
+       {'modulo': 'Módulo 4 · Métodos numéricos', 'servidor': servidor_global,
+        'cifras': [('Periodo', datos.inicio.strftime('%Y-%m-%d %H:%M') ~ ' → ' ~ datos.fin.strftime('%H:%M')),
+                   ('Paso h', h|f5 ~ ' h · ' ~ pasos ~ ' pasos'),
+                   ('Temperatura inicial', T0|f5 ~ ' °C'),
+                   ('Métodos comparados', '4')]}) }}
+
+  {% call p.diapositiva('El problema: predecir la temperatura del servidor', 'Problema real') %}
+    <div class="row g-4 align-items-center">
+      <div class="col-lg-7">
+        <ul>
+          <li>Queremos un <strong>gemelo digital térmico</strong>: un modelo que prediga la temperatura interna a partir de la carga.</li>
+          <li>Sirve para <strong>anticipar alarmas</strong>, probar escenarios de carga y <strong>detectar sensores defectuosos</strong>.</li>
+          <li>La temperatura cambia según el calor generado y el enfriamiento: eso se describe con una <strong>ecuación diferencial</strong>.</li>
+        </ul>
+        <div class="idea-clave">No existe una fórmula cerrada para T(t), porque P(t) y T<sub>entrada</sub>(t) son datos medidos. Por eso se resuelve <strong>numéricamente</strong>, paso a paso.</div>
+      </div>
+      <div class="col-lg-5"><div class="row g-2">
+        <div class="col-6">{{ p.cifra('Lecturas', datos.lecturas|length) }}</div>
+        <div class="col-6">{{ p.cifra('Duración', horas, 'h') }}</div>
+        <div class="col-6">{{ p.cifra('P mínima', datos.potencia|min|f5, 'W') }}</div>
+        <div class="col-6">{{ p.cifra('P máxima', datos.potencia|max|f5, 'W') }}</div>
+        <div class="col-12">{{ p.cifra('T inicial (primera lectura válida)', T0|f5, '°C', true) }}</div>
+      </div></div>
+    </div>
+  {% endcall %}
+
+  {% call p.diapositiva('El modelo térmico', 'Ecuación diferencial') %}
+    <div class="formula">$$\frac{dT}{dt} = \underbrace{\alpha\,(P(t) - P_{idle})}_{\text{calor por la carga}} \; - \; \underbrace{\beta\,(T - T_{entrada}(t))}_{\text{enfriamiento por el aire}}$$</div>
+    <div class="row g-2 mt-1">
+      <div class="col-md-3">{{ p.cifra('α', alfa|f5, '°C/(h·W)') }}</div>
+      <div class="col-md-3">{{ p.cifra('β', beta|f5, 'h⁻¹') }}</div>
+      <div class="col-md-3">{{ p.cifra('P idle', P_idle|f5, 'W') }}</div>
+      <div class="col-md-3">{{ p.cifra('Paso h', h|f5, 'h') }}</div>
+    </div>
+    <ul class="mt-3 mb-0">
+      <li><strong>P(t)</strong> y <strong>T<sub>entrada</sub>(t)</strong> se toman del Excel (lecturas horarias).</li>
+      <li>Si un método necesita valores <strong>entre horas</strong> (t + h/2, t + 3h/4), se <strong>interpolan linealmente</strong> entre las dos lecturas vecinas: no se inventan picos.</li>
+    </ul>
+  {% endcall %}
+
+  {% for r in resultados %}{% set i = info[r.metodo] %}
+  {% call p.diapositiva(r.metodo ~ ' · orden ' ~ i.orden, 'Método ' ~ loop.index) %}
+    {% if r.iteraciones %}{% set f = r.iteraciones[0] %}{% set k = f.ks %}{% set fila = comparacion[loop.index0] %}
+    <div class="row g-4">
+      <div class="col-lg-7">
+        <p>{{ i.idea }}</p>
+        <div class="formula">$${{ i.formula }}$$</div>
+        <p class="mb-1"><strong>Primer paso</strong> (t = {{ f.t|f5 }} h, T = {{ f.y|f5 }} °C, P = {{ f.P|f5 }} W, T<sub>ent</sub> = {{ f.T_ent|f5 }} °C):</p>
+        <div class="formula">$$\begin{aligned} k_1 &= {{ alfa|f5 }}({{ f.P|f5 }} - {{ P_idle|f5 }}) \\ &\quad - {{ beta|f5 }}({{ f.y|f5 }} - {{ f.T_ent|f5 }}) = {{ k.k1|f5 }} \end{aligned}$$
+          {% if k.k2 is defined %}$$k_2 = {{ k.k2|f5 }}{% if k.k3 is defined %},\quad k_3 = {{ k.k3|f5 }},\quad k_4 = {{ k.k4|f5 }}{% endif %}$${% endif %}
+          $$T_1 = {{ f.y_siguiente|f5 }}\ ^{\circ}C$$</div>
+        <p class="small mb-0"><span class="text-success"><i class="bi bi-hand-thumbs-up"></i> {{ i.ventaja }}</span> &nbsp;
+          <span class="text-danger"><i class="bi bi-exclamation-octagon"></i> {{ i.limitacion }}</span></p>
+      </div>
+      <div class="col-lg-5"><div class="row g-2">
+        <div class="col-12">{{ p.cifra('T simulada al final (t = ' ~ (r.datos_grafica.t[-1])|f5 ~ ' h)', r.resultado|f5, '°C', true) }}</div>
+        <div class="col-6">{{ p.cifra('Error promedio vs. historial', fila.error_promedio|f5, '°C') }}</div>
+        <div class="col-6">{{ p.cifra('Error máximo vs. historial', fila.error_maximo|f5, '°C') }}</div>
+        <div class="col-6">{{ p.cifra('Máx. |T − T RK4|', fila.dif_rk4|f5, '°C') }}</div>
+        <div class="col-6">{{ p.cifra('Evaluaciones de f', pasos * i.orden, '(' ~ i.orden ~ ' por paso)') }}</div>
+      </div></div>
+    </div>
+    {% else %}<div class="alert alert-warning">{{ r.mensaje }}</div>{% endif %}
+  {% endcall %}
+  {% endfor %}
+
+  {% call p.diapositiva('Las cuatro soluciones frente al historial', 'Resultado') %}
+    {{ m.grafica('s-edo-graf', graf, 400) }}
+  {% endcall %}
+
+  {% call p.diapositiva('Comparación de los métodos', 'Resultado') %}
+    <table class="table table-sm align-middle">
+      <thead><tr><th>Método</th><th>Orden</th><th>T final (°C)</th><th>Error prom. vs. historial</th><th>Error máx. vs. historial</th><th>Máx. |T − T<sub>RK4</sub>|</th></tr></thead>
+      <tbody>{% for f in comparacion %}<tr><td><strong>{{ f.metodo }}</strong></td><td>{{ info[f.metodo].orden }}</td><td>{{ f.resultado|f5 }}</td>
+        <td>{{ f.error_promedio|f5 }}</td><td>{{ f.error_maximo|f5 }}</td><td>{{ f.dif_rk4|f5 }}</td></tr>{% endfor %}</tbody>
+    </table>
+    <div class="row g-3">
+      <div class="col-md-6"><div class="idea-clave"><strong>Error numérico</strong> (método vs. RK4): Euler {{ comparacion[0].dif_rk4|f5 }} °C;
+        Heun/Ralston {{ comparacion[1].dif_rk4|f5 }} °C. Baja al subir el orden o reducir h.</div></div>
+      <div class="col-md-6"><div class="idea-clave"><strong>Error del modelo</strong> (RK4 vs. historial): {{ c4.error_promedio|f5 }} °C en promedio.
+        Depende de α y β, no del método numérico.</div></div>
+    </div>
+    {% if comparacion[1].resultado is not none and comparacion[2].resultado is not none and (comparacion[1].resultado - comparacion[2].resultado)|abs < 1e-9 %}
+    <p class="small text-muted mt-2 mb-0">Heun y Ralston coinciden porque f es lineal en T y, con entradas interpoladas linealmente, también en t dentro de cada hora.</p>{% endif %}
+  {% endcall %}
+
+  {% call p.diapositiva('¿Qué significa para el centro de datos?', 'Interpretación informática') %}
+    <ul>
+      <li>RK4 se usa como <strong>referencia numérica de mayor orden</strong>, no como solución exacta.</li>
+      <li>Con α = {{ alfa|f5 }}, el modelo difiere del historial en <strong>{{ c4.error_promedio|f5 }} °C</strong> en promedio
+        (máximo {{ c4.error_maximo|f5 }} °C).
+        {% if c4.error_promedio and c4.error_promedio > 3 and alfa_sug %}Ese desajuste viene de los <strong>parámetros</strong>, no del método.{% endif %}</li>
+      {% if alfa_sug %}<li>α calibrado con los datos del periodo: <strong>{{ alfa_sug|f5 }}</strong>
+        (equilibrio medio \( \alpha = \beta\,\overline{T - T_{ent}} / \overline{P - P_{idle}} \)).
+        <a href="{{ url_for('edo.index', fecha=form.fecha, horas=horas, alfa='%.6f'|format(alfa_sug), beta=beta, P_idle=P_idle, h=h) }}">Simular con α calibrado →</a></li>{% endif %}
+      <li>En operación: si la lectura real se aparta mucho de la simulación, puede haber un <strong>sensor defectuoso</strong> o una <strong>falla de ventilación</strong>.</li>
+    </ul>
+  {% endcall %}
+
+  {% call p.diapositiva('¿Qué método elegir?', 'Conclusión') %}
+    <div class="table-responsive"><table class="table table-sm">
+      <thead><tr><th>Método</th><th>Orden</th><th>Evaluaciones por paso</th><th>Cuándo usarlo</th></tr></thead><tbody>
+      <tr><td><strong>Euler</strong></td><td>1</td><td>1</td><td>Prototipos o pasos muy pequeños</td></tr>
+      <tr><td><strong>Heun</strong></td><td>2</td><td>2</td><td>Simulaciones frecuentes con buen balance costo/precisión</td></tr>
+      <tr><td><strong>Ralston</strong></td><td>2</td><td>2</td><td>Igual que Heun, con algo menos de error de truncamiento</td></tr>
+      <tr><td><strong>RK4</strong></td><td>4</td><td>4</td><td>Referencia numérica y simulaciones de alta calidad</td></tr>
+    </tbody></table></div>
+    <div class="idea-clave">Un buen gemelo digital necesita <strong>dos cosas</strong>: un método numérico preciso (RK4) <strong>y</strong> un modelo bien calibrado (α, β).
+      El método reduce el error numérico; solo los datos reducen el error del modelo.</div>
+  {% endcall %}
+{% endcall %}
+
+{{ p.separador_detalles() }}
+
+{% call m.bloque('explicacion', 'Explicación') %}
+  {% call m.paso(1, 'Problema real del centro de datos') %}
+    <p class="mb-0">Se quiere un <strong>gemelo digital térmico</strong> de {{ servidor_global }}: un modelo que, con la potencia consumida y la temperatura del aire de entrada,
+      prediga la temperatura interna hora a hora. Sirve para anticipar alarmas, probar escenarios de carga y detectar sensores defectuosos cuando la lectura se aleja de la simulación.</p>
+  {% endcall %}
+  {% call m.paso(2, 'Datos del Excel y parámetros') %}
+    <ul class="small mb-0">
+      <li>Periodo: {{ datos.inicio.strftime('%Y-%m-%d %H:%M') }} → {{ datos.fin.strftime('%Y-%m-%d %H:%M') }} ({{ horas }} h, {{ datos.lecturas|length }} lecturas).</li>
+      <li>Condición inicial: primera lectura válida del periodo, T(t₀ = {{ t0|f5 }}) = <strong>{{ T0|f5 }} °C</strong>.</li>
+      <li>α = {{ alfa|f5 }} °C/(h·W): calentamiento por cada vatio sobre el consumo en reposo · β = {{ beta|f5 }} h⁻¹: rapidez de enfriamiento hacia el aire de entrada ·
+        P<sub>idle</sub> = {{ P_idle|f5 }} W · h = {{ h|f5 }} h → {{ pasos }} pasos.</li>
+      <li><strong>Decisión sobre las entradas:</strong> P(t) y T<sub>entrada</sub>(t) solo se conocen a horas exactas. Cuando un método evalúa instantes intermedios
+        (t + h/2 en RK4, t + 3h/4 en Ralston) o h ≠ 1, se <strong>interpolan linealmente</strong> entre las dos lecturas vecinas: es la suposición más simple que no inventa picos.</li>
+      {% if alfa_sug %}<li class="text-primary">α calibrado sugerido para este periodo (equilibrio medio: \( \alpha = \beta\,\overline{(T - T_{ent})} / \overline{(P - P_{idle})} \)) =
+        <strong>{{ alfa_sug|f5 }}</strong>. <a href="{{ url_for('edo.index', fecha=form.fecha, horas=horas, alfa='%.6f'|format(alfa_sug), beta=beta, P_idle=P_idle, h=h) }}">Simular con α calibrado</a>.</li>{% endif %}
+    </ul>
+  {% endcall %}
+  {% call m.paso(3, 'Definición breve') %}
+    <p class="mb-0">Los métodos de un paso avanzan desde (t<sub>i</sub>, T<sub>i</sub>) usando una pendiente promedio. Euler usa solo la pendiente inicial (orden 1);
+      Heun y Ralston promedian dos pendientes (orden 2); RK4 combina cuatro (orden 4). RK4 se usa como <strong>referencia numérica de mayor orden, no como solución exacta</strong>.</p>
+  {% endcall %}
+  {% call m.paso(4, 'Fórmulas generales') %}
+    <div class="formula">$$\frac{dT}{dt} = f(t, T) = \alpha\,(P(t) - P_{idle}) - \beta\,(T - T_{entrada}(t))$$</div>
+    <div class="formula">$$\text{Euler: } T_{i+1} = T_i + h\,k_1,\quad k_1 = f(t_i, T_i)$$
+      $$\text{Heun: } k_2 = f(t_i + h,\, T_i + h k_1),\quad T_{i+1} = T_i + \tfrac{h}{2}(k_1 + k_2)$$
+      $$\text{Ralston: } k_2 = f(t_i + \tfrac{3}{4}h,\, T_i + \tfrac{3}{4}h k_1),\quad T_{i+1} = T_i + \tfrac{h}{3}(k_1 + 2k_2)$$
+      $$\text{RK4: } k_2 = f(t_i + \tfrac{h}{2}, T_i + \tfrac{h}{2}k_1),\ k_3 = f(t_i + \tfrac{h}{2}, T_i + \tfrac{h}{2}k_2),\ k_4 = f(t_i + h, T_i + h k_3),\ T_{i+1} = T_i + \tfrac{h}{6}(k_1 + 2k_2 + 2k_3 + k_4)$$</div>
+  {% endcall %}
+{% endcall %}
+
+{% call m.bloque('operacion', 'Operación') %}
+<ul class="nav nav-tabs">
+  {% for r in resultados %}<li class="nav-item"><button class="nav-link {{ 'active' if loop.first }}" data-bs-toggle="tab" data-bs-target="#te-{{ loop.index }}" type="button">{{ r.metodo }}</button></li>{% endfor %}
+</ul>
+<div class="tab-content pt-3">
+{% for r in resultados %}
+  {% set cols = [('paso','i','int'), ('t','t_i (h)'), ('y','T_i (°C)'), ('P','P(t_i) W'), ('T_ent','T_ent(t_i)'), ('ks.k1','k1')] %}
+  {% if r.metodo != 'Euler' %}{% set cols = cols + [('ks.k2','k2')] %}{% endif %}
+  {% if r.metodo == 'Runge-Kutta 4' %}{% set cols = cols + [('ks.k3','k3'), ('ks.k4','k4')] %}{% endif %}
+  {% set cols = cols + [('y_siguiente','T_{i+1} (°C)'), ('observado','Histórico (°C)')] %}
+  <div class="tab-pane fade {{ 'show active' if loop.first }}" id="te-{{ loop.index }}">
+  {% if r.iteraciones %}{% set f = r.iteraciones[0] %}{% set k = f.ks %}
+    {% call m.paso(5, 'Sustitución del primer paso: pendientes k') %}
+      <div class="formula">$$k_1 = {{ alfa|f5 }}({{ f.P|f5 }} - {{ P_idle|f5 }}) - {{ beta|f5 }}({{ f.y|f5 }} - {{ f.T_ent|f5 }}) = {{ k.k1|f5 }}$$
+        {% if r.metodo == 'Euler' %}$$T_1 = {{ f.y|f5 }} + {{ h|f5 }}({{ k.k1|f5 }}) = {{ f.y_siguiente|f5 }}\ ^{\circ}C$$
+        {% elif r.metodo == 'Runge-Kutta 4' %}$$k_2 = {{ k.k2|f5 }},\ k_3 = {{ k.k3|f5 }},\ k_4 = {{ k.k4|f5 }}$$
+          $$T_1 = {{ f.y|f5 }} + \frac{ {{ h|f5 }} }{6}\left({{ k.k1|f5 }} + 2({{ k.k2|f5 }}) + 2({{ k.k3|f5 }}) + {{ k.k4|f5 }}\right) = {{ f.y_siguiente|f5 }}\ ^{\circ}C$$
+        {% elif r.metodo.startswith('Heun') %}$$k_2 = f({{ (f.t + h)|f5 }},\ {{ f.y|f5 }} + {{ h|f5 }}({{ k.k1|f5 }})) = {{ k.k2|f5 }}$$
+          $$T_1 = {{ f.y|f5 }} + \frac{ {{ h|f5 }} }{2}({{ k.k1|f5 }} + {{ k.k2|f5 }}) = {{ f.y_siguiente|f5 }}\ ^{\circ}C$$
+        {% else %}$$k_2 = f({{ (f.t + 0.75 * h)|f5 }},\ {{ f.y|f5 }} + 0.75({{ h|f5 }})({{ k.k1|f5 }})) = {{ k.k2|f5 }}$$
+          $$T_1 = {{ f.y|f5 }} + \frac{ {{ h|f5 }} }{3}({{ k.k1|f5 }} + 2({{ k.k2|f5 }})) = {{ f.y_siguiente|f5 }}\ ^{\circ}C$${% endif %}</div>
+    {% endcall %}
+    {% call m.paso(6, 'Tabla paso a paso') %}{{ m.tabla(r.iteraciones, cols) }}{% endcall %}
+  {% else %}<div class="alert alert-warning">{{ r.mensaje }}</div>{% endif %}
+  </div>
+{% endfor %}
+</div>
+{% endcall %}
+
+{% call m.bloque('resultado', 'Resultado') %}
+  {% call m.paso(7, 'Temperatura simulada y comparación con el historial') %}
+    <div class="table-responsive"><table class="table table-sm align-middle">
+      <thead><tr><th>Método</th><th>Orden</th><th>T final simulada (°C)</th><th>Error promedio vs. historial (°C)</th><th>Error máximo vs. historial (°C)</th><th>Máx. |T − T<sub>RK4</sub>| (°C)</th><th>Puntos comparados</th><th>Tiempo (ms)</th></tr></thead>
+      <tbody>{% for f in comparacion %}{% set r = resultados[loop.index0] %}<tr><td><strong>{{ f.metodo }}</strong></td><td>{{ r.extra.orden if r.extra else '—' }}</td><td>{{ f.resultado|f5 }}</td>
+        <td>{{ f.error_promedio|f5 }}</td><td>{{ f.error_maximo|f5 }}</td><td>{{ f.dif_rk4|f5 }}</td><td>{{ f.n }}</td><td>{{ '%.4f'|format(f.tiempo_ms) }}</td></tr>{% endfor %}</tbody>
+    </table></div>
+    <p class="small mb-0">Lectura histórica final: {{ datos.temp_servidor[-1]|f5 }} °C. Las horas sin temperatura en el Excel no se usan en el error.</p>
+  {% endcall %}
+  {% call m.paso(8, 'Gráfica de las cuatro soluciones y los datos observados') %}{{ m.grafica('g-edo', graf, 420) }}{% endcall %}
+{% endcall %}
+
+{% call m.bloque('interpretacion', 'Interpretación informática') %}
+  {% call m.paso(9, 'Interpretación') %}
+    {% set ce = comparacion[0] %}{% set c4 = comparacion[3] %}
+    <p>Con h = {{ h|f5 }} h, Euler se separa de RK4 hasta <strong>{{ ce.dif_rk4|f5 }} °C</strong>; Heun y Ralston quedan a {{ comparacion[1].dif_rk4|f5 }} y {{ comparacion[2].dif_rk4|f5 }} °C.
+      Esa diferencia es <strong>error numérico</strong> y disminuye al reducir h o subir el orden.</p>
+    {% if comparacion[1].resultado is not none and comparacion[2].resultado is not none and (comparacion[1].resultado - comparacion[2].resultado)|abs < 1e-9 %}
+    <p><strong>¿Por qué Heun y Ralston dan lo mismo?</strong> Todos los métodos RK de dos etapas y orden 2 solo difieren en términos con f<sub>tt</sub>, f<sub>tT</sub> y f<sub>TT</sub>.
+      Aquí f es lineal en T y, como P(t) y T<sub>ent</sub>(t) se interpolan linealmente dentro de cada hora, también es lineal en t: esas derivadas son cero y ambos métodos coinciden
+      (diferencia {{ '%.1e'|format((comparacion[1].resultado - comparacion[2].resultado)|abs) }} °C). En la prueba automática con una EDO no lineal sí difieren.</p>
+    {% endif %}
+    <p>Frente al historial, RK4 tiene un error promedio de <strong>{{ c4.error_promedio|f5 }} °C</strong> y máximo de <strong>{{ c4.error_maximo|f5 }} °C</strong>.
+      {% if c4.error_promedio and c4.error_promedio > 3 %}Como RK4 apenas tiene error de truncamiento, este desajuste proviene del <strong>modelo y sus parámetros</strong>: con α = {{ alfa|f5 }}
+      el equilibrio simulado queda lejos del real. Pruebe el α calibrado ({{ alfa_sug|f5 }}) para ver cómo baja el error.{% else %}El modelo reproduce razonablemente la dinámica observada, por lo que puede usarse como gemelo digital para anticipar alarmas.{% endif %}</p>
+    <p class="mb-0">En operación, una lectura que se aparte varias veces del error típico respecto a la simulación puede indicar un sensor defectuoso o un cambio no registrado (p. ej., falla de un ventilador).</p>
+  {% endcall %}
+  {% call m.paso(10, 'Ventaja, limitación y criterio') %}
+    <div class="table-responsive"><table class="table table-sm"><thead><tr><th>Método</th><th>Ventaja</th><th>Limitación</th><th>Cuándo elegirlo</th></tr></thead><tbody>
+      <tr><td>Euler</td><td>Una evaluación de f por paso; el más simple.</td><td>Orden 1: error grande con h = 1 h; puede ser inestable si β·h &gt; 2.</td><td>Prototipos o pasos muy pequeños.</td></tr>
+      <tr><td>Heun</td><td>Orden 2 con 2 evaluaciones; corrige la pendiente con un predictor.</td><td>Necesita f en t + h (otra lectura).</td><td>Balance costo/precisión en simulaciones frecuentes.</td></tr>
+      <tr><td>Ralston</td><td>Orden 2 con el menor error de truncamiento entre los métodos de 2 etapas.</td><td>Evalúa en t + 3h/4: requiere interpolar las entradas.</td><td>Igual que Heun, buscando algo más de precisión.</td></tr>
+      <tr><td>RK4</td><td>Orden 4: muy preciso con pasos grandes.</td><td>4 evaluaciones por paso; sigue siendo una aproximación, no la solución exacta.</td><td>Referencia numérica y simulación de alta calidad.</td></tr>
+    </tbody></table></div>
+  {% endcall %}
+{% endcall %}
+{% endif %}
+{% endblock %}

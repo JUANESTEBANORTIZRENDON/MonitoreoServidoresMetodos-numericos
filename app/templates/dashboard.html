@@ -1,0 +1,71 @@
+{% extends "base.html" %}
+{% import "_macros.html" as m %}
+{% block titulo %}Dashboard{% endblock %}
+{% block contenido %}
+{{ m.encabezado(1, "Dashboard del servidor", "Indicadores térmicos y energéticos calculados en el backend a partir de la hoja Historial del Excel.") }}
+{{ m.aviso_sintetico() }}
+
+<form class="card card-body mb-3" method="get">
+  <div class="row g-2 align-items-end">
+    <div class="col-sm-6 col-md-3"><label class="form-label" for="desde">Desde</label>
+      <input class="form-control" type="date" id="desde" name="desde" value="{{ form.desde }}" min="{{ rango[0] }}" max="{{ rango[1] }}"></div>
+    <div class="col-sm-6 col-md-3"><label class="form-label" for="hasta">Hasta</label>
+      <input class="form-control" type="date" id="hasta" name="hasta" value="{{ form.hasta }}" min="{{ rango[0] }}" max="{{ rango[1] }}"></div>
+    <div class="col-sm-6 col-md-3"><label class="form-label" for="estado">Estado</label>
+      <select class="form-select" id="estado" name="estado">
+        <option value="">Todos</option>
+        {% for e in estados %}<option value="{{ e }}" {{ 'selected' if form.estado == e }}>{{ e }}</option>{% endfor %}
+      </select></div>
+    <div class="col-sm-6 col-md-3 d-flex gap-2">
+      <button class="btn btn-primary flex-fill"><i class="bi bi-funnel"></i> Filtrar</button>
+      <button class="btn btn-outline-secondary" type="button" data-restablecer>Restablecer</button>
+    </div>
+  </div>
+</form>
+{{ m.errores_formulario(errores) }}
+
+{% if resumen %}
+<div class="row g-3 mb-3">
+  <div class="col-6 col-lg-3"><div class="kpi"><div class="etiqueta">Servidor</div><div class="valor">{{ resumen.servidor }}</div>
+    <div class="small text-muted">{{ resumen.inicio.strftime('%Y-%m-%d %H:%M') }} → {{ resumen.fin.strftime('%Y-%m-%d %H:%M') }}</div></div></div>
+  <div class="col-6 col-lg-3"><div class="kpi"><div class="etiqueta">Registros</div><div class="valor">{{ "{:,}".format(resumen.registros).replace(",", ".") }}</div>
+    <div class="small text-muted">Lecturas horarias en el filtro</div></div></div>
+  <div class="col-6 col-lg-3"><div class="kpi"><div class="etiqueta">Temperatura promedio / máxima</div>
+    <div class="valor">{{ resumen.temp_promedio|f5 }} °C</div><div class="small text-muted">Máx.: <strong>{{ resumen.temp_maxima|f5 }} °C</strong></div></div></div>
+  <div class="col-6 col-lg-3"><div class="kpi"><div class="etiqueta">CPU / RAM promedio</div>
+    <div class="valor">{{ resumen.cpu_promedio|f5 }} %</div><div class="small text-muted">RAM: <strong>{{ resumen.ram_promedio|f5 }} %</strong></div></div></div>
+  <div class="col-6 col-lg-3"><div class="kpi"><div class="etiqueta">Energía total aproximada</div>
+    <div class="valor">{{ resumen.energia_kwh|f5 }} kWh</div><div class="small text-muted">{{ resumen.energia_nota }}
+      {% if resumen.resumen_global.get('Energía total (kWh)') %}La hoja «Resumen» reporta {{ resumen.resumen_global['Energía total (kWh)']|f5 }} kWh para los 3 meses (Σ P·1 h).{% endif %}</div></div></div>
+  <div class="col-6 col-lg-3"><div class="kpi preventivo"><div class="etiqueta">Estados preventivos</div>
+    <div class="valor">{{ resumen.conteo_estados.get('Preventivo', 0) }}</div><div class="small text-muted">70 °C ≤ T &lt; 80 °C</div></div></div>
+  <div class="col-6 col-lg-3"><div class="kpi alerta"><div class="etiqueta">Estados críticos</div>
+    <div class="valor">{{ resumen.conteo_estados.get('Crítico', 0) }}</div><div class="small text-muted">T ≥ 80 °C</div></div></div>
+  <div class="col-6 col-lg-3"><div class="kpi"><div class="etiqueta">Datos ausentes</div>
+    <div class="valor">{{ resumen.ausentes }}</div><div class="small text-muted">Temperaturas vacías (no se toman como 0 °C)</div></div></div>
+</div>
+
+<div class="card mb-3"><div class="card-body">{{ m.grafica("g-dashboard", grafica, 400) }}</div></div>
+
+<div class="row g-3">
+  <div class="col-lg-7">
+    <div class="card h-100"><div class="card-header">Resumen mensual (hoja «Resumen» del Excel)</div>
+      <div class="card-body"><div class="tabla-iter"><table class="table table-sm mb-0">
+        <thead><tr>{% for k in (resumen.resumen_mensual[0].keys() if resumen.resumen_mensual else []) %}<th>{{ k }}</th>{% endfor %}</tr></thead>
+        <tbody>{% for fila in resumen.resumen_mensual %}<tr>{% for v in fila.values() %}<td>{{ v if v is string else v|f5 if v is float else v }}</td>{% endfor %}</tr>{% endfor %}</tbody>
+      </table></div></div></div>
+  </div>
+  <div class="col-lg-5">
+    <div class="card h-100"><div class="card-header">Interpretación informática</div><div class="card-body small">
+      <p>En el periodo filtrado, {{ resumen.servidor }} operó con una CPU media de <strong>{{ resumen.cpu_promedio|f5 }} %</strong>
+        y una temperatura media de <strong>{{ resumen.temp_promedio|f5 }} °C</strong>, con un pico de <strong>{{ resumen.temp_maxima|f5 }} °C</strong>.</p>
+      <p>Hubo <strong>{{ resumen.conteo_estados.get('Preventivo', 0) }}</strong> horas en estado preventivo y
+        <strong>{{ resumen.conteo_estados.get('Crítico', 0) }}</strong> en estado crítico, lo que identifica ventanas en las que conviene redistribuir carga
+        o reforzar la refrigeración.</p>
+      <p class="mb-0">La energía de <strong>{{ resumen.energia_kwh|f5 }} kWh</strong> se obtuvo integrando numéricamente la potencia; el detalle de los métodos está en el módulo 3 (Integración numérica).
+        Las {{ resumen.ausentes }} temperaturas ausentes se excluyen de promedios y máximos (no se toman como 0 °C).</p>
+    </div></div>
+  </div>
+</div>
+{% endif %}
+{% endblock %}

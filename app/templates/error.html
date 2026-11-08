@@ -1,0 +1,11 @@
+{% extends "base.html" %}
+{% block titulo %}{{ titulo }}{% endblock %}
+{% block contenido %}
+<div class="encabezado-modulo" style="border-left-color: var(--naranja-fuerte)">
+  <h2><i class="bi bi-exclamation-octagon"></i> {{ titulo }}</h2>
+  <p class="mb-2">{{ mensaje }}</p>
+  <p class="small text-muted mb-0">Verifique que el archivo <code>data/Historial_Monitoreo_Servidor_3_Meses.xlsx</code> exista y conserve las hojas
+    <em>Resumen</em>, <em>Historial</em> y <em>Diccionario</em> con sus columnas originales. Luego reinicie la aplicación.</p>
+</div>
+<a class="btn btn-primary" href="/">Volver al inicio</a>
+{% endblock %}
