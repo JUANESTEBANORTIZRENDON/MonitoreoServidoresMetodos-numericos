@@ -49,3 +49,22 @@ def test_descarga_excel_original(client):
     r = client.get("/datos/descargar")
     assert r.status_code == 200
     assert r.data[:2] == b"PK"
+
+
+def test_glosario_responde_y_aparece_en_el_menu(client):
+    html = client.get("/glosario/").get_data(as_text=True)
+    assert "Glosario de términos" in html
+    for termino in ("Vatio-hora", "Kilovatio-hora", "Regla del trapecio compuesto", "Runge-Kutta"):
+        assert termino in html
+    assert 'href="/glosario/"' in client.get("/").get_data(as_text=True)
+
+
+def test_glosario_terminos_tienen_categoria_valida():
+    from app.models.glosario import CATEGORIAS, TERMINOS
+    claves = {c for c, _, _ in CATEGORIAS}
+    assert TERMINOS and all(t["categoria"] in claves and t["definicion"] for t in TERMINOS)
+
+
+def test_punto_de_entrada_wsgi():
+    import wsgi
+    assert wsgi.app.test_client().get("/glosario/").status_code == 200

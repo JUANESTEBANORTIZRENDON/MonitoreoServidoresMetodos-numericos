@@ -1,0 +1,21 @@
+# Blueprint de Render: https://render.com/docs/blueprint-spec
+# Despliegue: Render → New → Blueprint → seleccionar este repositorio.
+services:
+  - type: web
+    name: monitor-numerico-centro-datos
+    runtime: python
+    plan: free
+    region: oregon
+    branch: main
+    autoDeploy: true
+    buildCommand: pip install --upgrade pip && pip install -r requirements.txt
+    # Un solo proceso con hilos: el Excel se carga una vez y cabe en los 512 MB del plan gratuito.
+    startCommand: gunicorn wsgi:app --bind 0.0.0.0:$PORT --workers 1 --threads 4 --timeout 120
+    healthCheckPath: /
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.12.8
+      - key: SECRET_KEY
+        generateValue: true
+      - key: FLASK_DEBUG
+        value: "0"

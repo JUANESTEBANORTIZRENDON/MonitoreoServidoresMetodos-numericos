@@ -14,6 +14,7 @@ y las **ecuaciones diferenciales ordinarias** se aplican al monitoreo energétic
 | 2 | Historial del Excel | Tabla paginada en el servidor, filtros, diccionario, descarga del original |
 | 3 | Integración numérica | Trapecio, Simpson 1/3, Simpson 3/8 y Romberg sobre la potencia → energía (Wh, kWh) |
 | 4 | Ecuaciones diferenciales | Euler, Heun, Ralston y RK4 sobre el modelo térmico dT/dt = α(P − P_idle) − β(T − T_ent) |
+| 5 | Glosario | W, Wh, kWh, potencia vs. energía, temperaturas, α, β, métodos y errores, con buscador y filtros por categoría |
 
 Los módulos 3 y 4 están organizados para una **exposición en pareja**:
 
@@ -48,10 +49,22 @@ pip install -r requirements.txt
 python app.py
 ```
 
-Abra <http://127.0.0.1:5000>. Modo depuración (recarga al editar): `$env:FLASK_DEBUG = "1"; python app.py`.
+Al arrancar, la consola muestra la dirección local; abra <http://127.0.0.1:5000> (glosario en <http://127.0.0.1:5000/glosario/>). Modo depuración (recarga al editar): `$env:FLASK_DEBUG = "1"; python app.py`.
 
 Si el Excel no existe o su estructura no es la esperada, la aplicación arranca igualmente y muestra una
 página de error explicando el problema. Los errores técnicos se registran en `logs/app.log`.
+
+## Despliegue en Render
+
+El repositorio incluye `render.yaml` (Blueprint) y `wsgi.py` (punto de entrada de producción).
+
+1. En <https://dashboard.render.com> elija **New → Blueprint** y conecte este repositorio de GitHub.
+2. Render lee `render.yaml`: instala `requirements.txt` con Python 3.12 y arranca
+   `gunicorn wsgi:app --bind 0.0.0.0:$PORT`.
+3. Pulse **Apply**. Al terminar, la aplicación queda en `https://monitor-numerico-centro-datos.onrender.com`
+   (o el nombre que asigne Render). Cada `git push` a `main` vuelve a desplegar.
+
+En el plan gratuito el servicio se suspende tras 15 minutos sin visitas; la primera visita siguiente tarda unos segundos.
 
 ## Pruebas
 
@@ -59,10 +72,10 @@ página de error explicando el problema. Los errores técnicos se registran en `
 python -m pytest -v
 ```
 
-40 pruebas cubren: carga de las tres hojas, 2.208 registros, fechas consecutivas, servidor SRV-DC-01,
+43 pruebas cubren: carga de las tres hojas, 2.208 registros, fechas consecutivas, servidor SRV-DC-01,
 11 temperaturas ausentes, condiciones de Simpson 1/3 y 3/8, estructura de la tabla de Romberg,
-Euler/Heun/Ralston/RK4 contra soluciones exactas (incluido su orden de convergencia), las rutas web y
-las diapositivas de las presentaciones.
+Euler/Heun/Ralston/RK4 contra soluciones exactas (incluido su orden de convergencia), las rutas web,
+las diapositivas de las presentaciones, el glosario y el punto de entrada WSGI.
 
 ## Estructura
 

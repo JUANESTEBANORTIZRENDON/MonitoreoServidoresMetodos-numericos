@@ -150,6 +150,34 @@ code.mono { color: var(--azul-oscuro); }
 .cifra-destacada { background: var(--azul-oscuro); border-color: var(--azul-oscuro); }
 .cifra-destacada .cifra-etiqueta { color: #b8d4f1; }
 .cifra-destacada .cifra-valor { color: #fff; }
+/* Columna de cifras apiladas: cada tarjeta mide lo que su contenido, sin estirarse */
+.cifra-pila { display: flex; flex-direction: column; gap: .6rem; }
+.cifra-pila > .cifra { height: auto; }
+.cifra-destacada .cifra-valor small { color: #b8d4f1; font-weight: 600; }
+.pasos-calculo { list-style: none; counter-reset: paso; margin: 0; padding: .4rem .9rem;
+  background: var(--azul-suave); border: 1px solid var(--borde); border-radius: .5rem; font-size: .9rem; }
+.pasos-calculo li { counter-increment: paso; display: flex; justify-content: space-between; align-items: baseline;
+  gap: .75rem; padding: .3rem 0; border-bottom: 1px dashed var(--borde); }
+.pasos-calculo li:last-child { border-bottom: 0; }
+.pasos-calculo li span::before { content: counter(paso) ". "; color: #9a4a0b; font-weight: 700; }
+.pasos-calculo li strong { color: var(--azul-oscuro); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.pasos-calculo li:last-child strong { color: #9a4a0b; }
+
+/* ===================== Glosario ===================== */
+.glosario-titulo { color: var(--azul-oscuro); font-weight: 700; font-size: 1.15rem;
+  border-bottom: 2px solid var(--naranja); padding-bottom: .35rem; margin-bottom: .9rem; }
+.glosario-termino { background: #fff; border: 1px solid var(--borde); border-radius: .6rem; padding: .9rem 1rem;
+  height: 100%; display: flex; flex-direction: column; }
+.glosario-termino header { display: flex; justify-content: space-between; align-items: flex-start; gap: .5rem; }
+.glosario-termino h5 { font-size: 1rem; font-weight: 700; color: var(--azul-oscuro); margin: 0 0 .35rem; }
+.glosario-unidad { background: var(--azul-claro); color: var(--azul-oscuro); font-size: .75rem; font-weight: 600;
+  padding: .1rem .5rem; border-radius: 1rem; white-space: nowrap; }
+.glosario-simbolo { background: var(--azul-suave); border-radius: .35rem; padding: .35rem .6rem; margin-bottom: .5rem;
+  overflow-x: auto; }
+.glosario-termino p { margin-bottom: .4rem; font-size: .9rem; }
+.glosario-ejemplo { background: #fff7ed; border-left: 4px solid var(--naranja); padding: .35rem .6rem;
+  border-radius: .25rem; margin-top: auto; margin-bottom: 0 !important; }
+.glosario-ejemplo .bi { color: #9a4a0b; }
 
 .separador-detalles { display: flex; flex-direction: column; align-items: center; text-align: center;
   margin: 2rem 0 1.25rem; padding-top: 1rem; border-top: 2px dashed var(--borde); }

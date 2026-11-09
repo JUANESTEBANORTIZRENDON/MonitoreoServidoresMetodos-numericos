@@ -1,0 +1,87 @@
+{% extends "base.html" %}
+{% import "_macros.html" as m %}
+{% block titulo %}Glosario{% endblock %}
+{% block contenido %}
+{{ m.encabezado(5, "Glosario de términos", "Unidades, conceptos y métodos que aparecen en el proyecto, con ejemplos aplicados al servidor " ~ servidor_global ~ ".") }}
+
+<div class="card card-body mb-3 glosario-herramientas">
+  <div class="row g-2 align-items-center">
+    <div class="col-md-5">
+      <div class="input-group">
+        <span class="input-group-text"><i class="bi bi-search"></i></span>
+        <input type="search" class="form-control" id="glosario-buscar" placeholder="Buscar: kWh, trapecio, RK4, α…" aria-label="Buscar término">
+      </div>
+    </div>
+    <div class="col-md-7 d-flex flex-wrap gap-1" role="group" aria-label="Filtrar por categoría">
+      <button type="button" class="btn btn-sm btn-primary glosario-filtro" data-categoria="todas">Todas ({{ total }})</button>
+      {% for clave, nombre, icono, terminos in grupos %}
+      <button type="button" class="btn btn-sm btn-outline-primary glosario-filtro" data-categoria="{{ clave }}"><i class="bi {{ icono }}"></i> {{ nombre }}</button>
+      {% endfor %}
+    </div>
+  </div>
+</div>
+
+<div class="idea-clave mb-4"><strong>Regla de oro de las unidades:</strong> potencia (W) × tiempo (h) = energía (Wh) · Wh ÷ 1000 = kWh.
+  Integrar la potencia en el tiempo es exactamente lo que hacen el trapecio, Simpson y Romberg.</div>
+
+{% for clave, nombre, icono, terminos in grupos %}
+<section class="glosario-grupo mb-4" data-categoria="{{ clave }}">
+  <h4 class="glosario-titulo"><i class="bi {{ icono }}"></i> {{ nombre }} <span class="badge text-bg-light">{{ terminos|length }}</span></h4>
+  <div class="row g-3">
+    {% for t in terminos %}
+    <div class="col-md-6 col-xl-4 glosario-item">
+      <article class="glosario-termino">
+        <header>
+          <h5>{{ t.termino }}</h5>
+          {% if t.unidad %}<span class="glosario-unidad">{{ t.unidad }}</span>{% endif %}
+        </header>
+        {% if t.simbolo %}<div class="glosario-simbolo">\({{ t.simbolo }}\)</div>{% endif %}
+        <p>{{ t.definicion }}</p>
+        {% if t.ejemplo %}<p class="glosario-ejemplo"><i class="bi bi-lightbulb"></i> {{ t.ejemplo }}</p>{% endif %}
+      </article>
+    </div>
+    {% endfor %}
+  </div>
+</section>
+{% endfor %}
+<p class="text-muted" id="glosario-vacio" hidden>No hay términos que coincidan con la búsqueda.</p>
+{% endblock %}
+
+{% block scripts %}
+<script>
+(function () {
+  const buscar = document.getElementById("glosario-buscar");
+  const filtros = document.querySelectorAll(".glosario-filtro");
+  const vacio = document.getElementById("glosario-vacio");
+  let categoria = "todas";
+  const normalizar = (s) => s.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
+
+  function aplicar() {
+    const q = normalizar(buscar.value.trim());
+    let visibles = 0;
+    document.querySelectorAll(".glosario-grupo").forEach((grupo) => {
+      let enGrupo = 0;
+      const activa = categoria === "todas" || grupo.dataset.categoria === categoria;
+      grupo.querySelectorAll(".glosario-item").forEach((item) => {
+        const ok = activa && (!q || normalizar(item.textContent).includes(q));
+        item.hidden = !ok;
+        if (ok) enGrupo++;
+      });
+      grupo.hidden = enGrupo === 0;
+      visibles += enGrupo;
+    });
+    vacio.hidden = visibles > 0;
+  }
+
+  filtros.forEach((b) => b.addEventListener("click", () => {
+    categoria = b.dataset.categoria;
+    filtros.forEach((x) => {
+      x.classList.toggle("btn-primary", x === b);
+      x.classList.toggle("btn-outline-primary", x !== b);
+    });
+    aplicar();
+  }));
+  buscar.addEventListener("input", aplicar);
+})();
+</script>
+{% endblock %}

@@ -54,8 +54,9 @@ def create_app(config_class=Config) -> Flask:
         app.extensions["error_datos"] = str(exc)
 
     from app.controllers import (dashboard_controller, datos_controller, edo_controller,
-                                 integracion_controller)
-    for modulo in (dashboard_controller, datos_controller, integracion_controller, edo_controller):
+                                 glosario_controller, integracion_controller)
+    for modulo in (dashboard_controller, datos_controller, integracion_controller, edo_controller,
+                   glosario_controller):
         app.register_blueprint(modulo.bp)
 
     @app.before_request

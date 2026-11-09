@@ -4,3 +4,5 @@ pandas>=2.2
 openpyxl>=3.1
 numpy>=1.26
 pytest>=8.0
+# Servidor de producción (Render). No funciona en Windows; allí se usa «python app.py».
+gunicorn>=23.0; platform_system != "Windows"
